@@ -1,0 +1,23 @@
+[project]
+name = "xhtml-pdf-exporter"
+version = "0.1.0"
+description = "Export XHTML to PDF with dynamic page orientation"
+requires-python = ">=3.13"
+dependencies = [
+    "playwright>=1.39.0",
+    "PyPDF2>=3.0.0",
+]
+
+[project.scripts]
+xhtml2pdf = "xhtml_pdf_exporter.pdf_exporter:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/xhtml_pdf_exporter"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
