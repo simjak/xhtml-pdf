@@ -36,8 +36,13 @@ class PDFExporter:
 
                 # Generate PDF for each page with correct orientation
                 for i, (width, height) in enumerate(dimensions):
-                    # Configure PDF options for this page
-                    pdf_options = self._configure_pdf_options([(width, height)])
+                    # Configure PDF options and viewport for this page
+                    is_landscape = width > height
+                    pdf_options = self._configure_pdf_options(is_landscape)
+                    viewport = self._configure_viewport(is_landscape)
+
+                    # Set viewport size
+                    page.set_viewport_size(viewport)
 
                     # Hide all pages except current one
                     page.evaluate("""(index) => {
@@ -85,6 +90,8 @@ class PDFExporter:
             }
             div.pageView {
                 margin-bottom: 20px;
+                transform-origin: top left;
+                transform: scale(0.95);
             }
             div.pageView.landscape {
                 page: landscape;
@@ -102,16 +109,27 @@ class PDFExporter:
             });
         }""", dimensions)
 
-    def _configure_pdf_options(self, dimensions: List[Tuple[float, float]]) -> Dict[str, Any]:
-        """Configure PDF options based on page dimensions."""
-        width, height = dimensions[0]
-        is_landscape = width > height
+    def _configure_viewport(self, is_landscape: bool) -> Dict[str, int]:
+        """Configure viewport size based on orientation."""
+        if is_landscape:
+            return {
+                "width": 1414,  # A4 landscape width
+                "height": 1000  # A4 landscape height
+            }
+        else:
+            return {
+                "width": 1000,  # A4 portrait width
+                "height": 1414  # A4 portrait height
+            }
 
+    def _configure_pdf_options(self, is_landscape: bool) -> Dict[str, Any]:
+        """Configure PDF options based on orientation."""
         return {
             "print_background": True,
             "prefer_css_page_size": True,
             "format": "A4",
             "landscape": is_landscape,
+            "scale": 0.95  # Scale down slightly to ensure content fits
         }
 
 def main():
