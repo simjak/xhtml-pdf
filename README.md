@@ -1,0 +1,1 @@
+rm -rf test_images && mkdir test_images && time uv run python -m src.xhtml_pdf_exporter.pdf_exporter flo-2023-12-31-en.xhtml test_images --format jpeg --quality 90
