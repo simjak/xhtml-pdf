@@ -1,19 +1,34 @@
 import os
+import enum
 import tempfile
 from pathlib import Path
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
 from playwright.sync_api import sync_playwright, Page
 from PyPDF2 import PdfMerger
 
-class PDFExporter:
-    def __init__(self, input_file: str):
-        """Initialize PDF exporter with input XHTML file path."""
+class ExportFormat(enum.Enum):
+    """Export format options."""
+    PDF = "pdf"
+    JPEG = "jpeg"
+
+    def __str__(self) -> str:
+        return self.value
+
+class DocumentExporter:
+    def __init__(self, input_file: str, export_format: ExportFormat = ExportFormat.PDF):
+        """Initialize document exporter with input XHTML file path and format."""
         self.input_file = Path(input_file)
+        self.export_format = export_format
         if not self.input_file.exists():
             raise FileNotFoundError(f"Input file not found: {input_file}")
 
-    def export_to_pdf(self, output_file: str) -> None:
-        """Export XHTML to PDF with dynamic page orientation detection."""
+    def export(self, output_path: str, jpeg_quality: Optional[int] = None) -> None:
+        """Export XHTML to PDF or JPEG with dynamic page orientation detection.
+
+        Args:
+            output_path: For PDF, this is the output file path. For JPEG, this is the output directory.
+            jpeg_quality: Optional quality setting for JPEG export (1-100).
+        """
         with sync_playwright() as p:
             browser = p.chromium.launch()
             context = browser.new_context()
@@ -30,41 +45,86 @@ class PDFExporter:
             self._inject_orientation_css(page)
             self._apply_orientation_classes(page, dimensions)
 
-            # Create temporary directory for individual PDFs
-            with tempfile.TemporaryDirectory() as temp_dir:
-                pdf_files = []
-
-                # Generate PDF for each page with correct orientation
-                for i, (width, height) in enumerate(dimensions):
-                    # Configure PDF options and viewport for this page
-                    is_landscape = width > height
-                    pdf_options = self._configure_pdf_options(is_landscape)
-                    viewport = self._configure_viewport(is_landscape)
-
-                    # Set viewport size
-                    page.set_viewport_size(viewport)
-
-                    # Hide all pages except current one
-                    page.evaluate("""(index) => {
-                        document.querySelectorAll('div.pageView').forEach((el, i) => {
-                            el.style.display = i === index ? 'block' : 'none';
-                        });
-                    }""", i)
-
-                    # Generate PDF for this page
-                    temp_pdf = os.path.join(temp_dir, f"page_{i}.pdf")
-                    page.pdf(path=temp_pdf, **pdf_options)
-                    pdf_files.append(temp_pdf)
-
-                # Merge PDFs
-                merger = PdfMerger()
-                for pdf_file in pdf_files:
-                    merger.append(pdf_file)
-
-                merger.write(output_file)
-                merger.close()
+            if self.export_format == ExportFormat.PDF:
+                self._export_pdf(page, dimensions, output_path)
+            else:  # JPEG
+                self._export_jpeg(page, dimensions, output_path, jpeg_quality)
 
             browser.close()
+
+    def _export_pdf(self, page: Page, dimensions: List[Tuple[float, float]], output_file: str) -> None:
+        """Export pages to a single PDF file."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pdf_files = []
+
+            # Generate PDF for each page with correct orientation
+            for i, (width, height) in enumerate(dimensions):
+                # Configure PDF options and viewport for this page
+                is_landscape = width > height
+                pdf_options = self._configure_pdf_options(is_landscape)
+                viewport = self._configure_viewport(is_landscape)
+
+                # Set viewport size
+                page.set_viewport_size(viewport)
+
+                # Hide all pages except current one
+                page.evaluate("""(index) => {
+                    document.querySelectorAll('div.pageView').forEach((el, i) => {
+                        el.style.display = i === index ? 'block' : 'none';
+                    });
+                }""", i)
+
+                # Generate PDF for this page
+                temp_pdf = os.path.join(temp_dir, f"page_{i}.pdf")
+                page.pdf(path=temp_pdf, **pdf_options)
+                pdf_files.append(temp_pdf)
+
+            # Merge PDFs
+            merger = PdfMerger()
+            for pdf_file in pdf_files:
+                merger.append(pdf_file)
+
+            merger.write(output_file)
+            merger.close()
+
+    def _export_jpeg(self, page: Page, dimensions: List[Tuple[float, float]], output_dir: str, quality: Optional[int] = None) -> None:
+        """Export each page as a JPEG file."""
+        # Create output directory if it doesn't exist
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        # Generate JPEG for each page with correct orientation
+        for i, (width, height) in enumerate(dimensions):
+            # Configure viewport for this page
+            is_landscape = width > height
+            viewport = self._configure_viewport(is_landscape)
+
+            # Set viewport size
+            page.set_viewport_size(viewport)
+
+            # Hide all pages except current one
+            page.evaluate("""(index) => {
+                document.querySelectorAll('div.pageView').forEach((el, i) => {
+                    el.style.display = i === index ? 'block' : 'none';
+                });
+            }""", i)
+
+            # Configure screenshot options
+            screenshot_options = {
+                "type": "jpeg",
+                "path": str(output_path / f"page_{i:03d}.jpg"),
+                "clip": {
+                    "x": 0,
+                    "y": 0,
+                    "width": viewport["width"],
+                    "height": viewport["height"]
+                }
+            }
+            if quality is not None:
+                screenshot_options["quality"] = quality
+
+            # Generate JPEG for this page
+            page.screenshot(**screenshot_options)
 
     def _get_page_dimensions(self, page: Page) -> List[Tuple[float, float]]:
         """Get dimensions for each page section to determine orientation."""
@@ -136,14 +196,28 @@ def main():
     """CLI entry point."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Export XHTML to PDF with dynamic orientation")
+    parser = argparse.ArgumentParser(description="Export XHTML to PDF or JPEG with dynamic orientation")
     parser.add_argument("input_file", help="Input XHTML file path")
-    parser.add_argument("output_file", help="Output PDF file path")
+    parser.add_argument("output_path", help="Output PDF file or directory path for JPEGs")
+    parser.add_argument(
+        "--format", "-f",
+        type=ExportFormat,
+        choices=list(ExportFormat),
+        default=ExportFormat.PDF,
+        help="Output format (pdf or jpeg)"
+    )
+    parser.add_argument(
+        "--quality", "-q",
+        type=int,
+        choices=range(1, 101),
+        metavar="[1-100]",
+        help="JPEG quality (1-100, only applies to JPEG format)"
+    )
 
     args = parser.parse_args()
 
-    exporter = PDFExporter(args.input_file)
-    exporter.export_to_pdf(args.output_file)
+    exporter = DocumentExporter(args.input_file, args.format)
+    exporter.export(args.output_path, args.quality)
 
 if __name__ == "__main__":
     main()
