@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Export XHTML to PDF with dynamic page orientation"
 requires-python = ">=3.13"
 dependencies = [
+    "bs4>=0.0.2",
     "playwright>=1.39.0",
     "PyPDF2>=3.0.0",
 ]

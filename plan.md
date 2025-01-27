@@ -14,42 +14,42 @@ Each tool produces different HTML structures, making it unreliable to depend on 
 
 ## Current Issues
 
-1. **Too Much Complexity**
-   - Relies on specific HTML structures
-   - Tries to handle different tool outputs
-   - Complex CSS manipulation
-   - Fragile page detection
+1. **Document Size Problems**
+   - Some documents are extremely tall (300,000+ pixels)
+   - Trying to render as single page fails
+   - No proper page breaks
+   - Memory issues with large documents
 
-2. **Unreliable Orientation**
-   - Different tools use different approaches
-   - CSS classes aren't consistent
-   - Page containers vary
-   - Structure assumptions break
+2. **Inconsistent Sizing**
+   - Different tools use different dimensions
+   - No standard page sizes
+   - Content may overflow
+   - Scaling issues
 
 ## Simplified Solution
 
-### 1. Core Orientation Detection
+### 1. Standard Page Sizing
 
 ```python
-def detect_orientation(self, page: Page) -> bool:
-    """Detect if content is landscape by checking rendered dimensions.
-    Returns True if landscape, False if portrait."""
+def get_page_dimensions(self) -> tuple[int, int]:
+    """Get standard A4 dimensions in pixels."""
+    # A4 at 96 DPI
+    return (794, 1123)  # Standard A4 dimensions
 
-    # Get full document dimensions as rendered
+def get_content_dimensions(self, page) -> tuple[int, int]:
+    """Get actual content dimensions."""
     width = page.evaluate("document.documentElement.scrollWidth")
     height = page.evaluate("document.documentElement.scrollHeight")
-
-    # Simple width > height comparison
-    return width > height
+    return width, height
 ```
 
 **Benefits:**
-- Works with any XHTML structure
-- No assumptions about HTML patterns
-- Pure dimension-based decision
-- Reliable across all tools
+- Consistent page sizes
+- Standard A4 dimensions
+- Predictable output
+- Better printing support
 
-### 2. Simplified Export
+### 2. Content Scaling
 
 ```python
 def export(self, output_path: str) -> None:
@@ -57,56 +57,64 @@ def export(self, output_path: str) -> None:
         browser = p.chromium.launch()
         page = browser.new_page()
 
-        # Load and render
+        # Load and wait for content
         page.goto(f"file://{self.input_file.absolute()}")
         page.wait_for_load_state("networkidle")
 
-        # Let browser handle everything except orientation
+        # Get dimensions
+        content_width, content_height = self.get_content_dimensions(page)
+        page_width, page_height = self.get_page_dimensions()
+
+        # Calculate scale to fit width
+        scale = min(1.0, page_width / content_width)
+
+        # Generate PDF with proper sizing
         page.pdf(
             path=output_path,
+            scale=scale,
+            width=f"{page_width}px",
+            height=f"{page_height}px",
             print_background=True,
-            prefer_css_page_size=True,
-            landscape=self.detect_orientation(page)
+            prefer_css_page_size=False
         )
-
-        browser.close()
 ```
 
 **Benefits:**
-- Minimal code
-- No CSS injection
-- Browser handles rendering
-- Just one decision: landscape or portrait
+- Content always fits width
+- Automatic scaling
+- Preserves readability
+- Handles any document size
 
 ## Implementation Strategy
 
-1. **Simplify Code**
-   - Remove pattern detection
-   - Remove CSS manipulation
-   - Focus on orientation only
-   - Let browser handle the rest
+1. **Core Changes**
+   - Use standard page sizes
+   - Implement content scaling
+   - Remove viewport manipulation
+   - Let browser handle pagination
 
 2. **Testing**
-   - Test with various XHTML sources
-   - Verify orientation detection
-   - Check PDF output quality
+   - Test with very large documents
+   - Verify page breaks
+   - Check scaling quality
+   - Ensure readability
 
 ## Expected Outcomes
 
 1. **Reliability**
+   - Works with any document size
+   - Consistent page sizes
+   - Proper scaling
+   - No memory issues
+
+2. **Quality**
+   - Professional output
+   - Standard A4 pages
+   - Readable content
+   - Clean page breaks
+
+3. **Compatibility**
    - Works with any XHTML
-   - Correct orientation
-   - Consistent output
-   - Tool-agnostic
-
-2. **Simplicity**
-   - Minimal code
-   - Easy to maintain
-   - Clear logic
-   - No assumptions
-
-3. **Future-Proof**
-   - Works with new tools
-   - No structure dependencies
-   - Easy to understand
-   - Easy to modify if needed
+   - Handles any content size
+   - Standard PDF output
+   - Print-friendly results
