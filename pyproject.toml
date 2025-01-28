@@ -6,7 +6,10 @@ requires-python = ">=3.13"
 dependencies = [
     "bs4>=0.0.2",
     "playwright>=1.39.0",
-    "PyPDF2>=3.0.0",
+    "pypdf2>=3.0.0",
+    "openai>=1.0.0",
+    "tenacity>=8.0.0",
+    "lxml>=5.3.0",
 ]
 
 [project.scripts]

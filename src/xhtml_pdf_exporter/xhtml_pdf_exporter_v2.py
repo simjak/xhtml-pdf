@@ -1,15 +1,20 @@
-"""XHTML to PDF converter with automatic orientation detection based on rendered dimensions."""
+"""
+XHTML to PDF converter that determines optimal page orientation using content dimensions.
+"""
 
 import enum
+import logging
 from pathlib import Path
 from typing import Optional
 
 from playwright.sync_api import sync_playwright
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 class ExportFormat(enum.Enum):
-    """Export format options."""
-
     PDF = "pdf"
     JPEG = "jpeg"
 
@@ -17,134 +22,138 @@ class ExportFormat(enum.Enum):
         return self.value
 
 
+# A4 dimensions
+A4_WIDTH_PX = 794  # Base width in pixels
+A4_RATIO = 1.414  # Standard A4 ratio (297mm / 210mm)
+A4_PORTRAIT = (A4_WIDTH_PX, int(A4_WIDTH_PX * A4_RATIO))  # 794 x 1123
+A4_LANDSCAPE = (int(A4_WIDTH_PX * A4_RATIO), A4_WIDTH_PX)  # 1123 x 794
+
+
+def _get_pf_orientation(page) -> Optional[str]:
+    """
+    Determine orientation from .pf page containers, if present.
+    Returns 'portrait', 'landscape', or None if no pf elements were found.
+    """
+    pf_data = page.evaluate(
+        """() => {
+            const pfElements = Array.from(document.querySelectorAll('.pf'));
+            if (!pfElements.length) return null;
+            return pfElements.map(el => {
+                const rect = el.getBoundingClientRect();
+                return { width: rect.width, height: rect.height };
+            });
+        }"""
+    )
+
+    if not pf_data:
+        return None
+
+    portrait_count = sum(1 for dims in pf_data if dims["height"] > dims["width"])
+    landscape_count = len(pf_data) - portrait_count
+
+    if landscape_count > portrait_count:
+        return "landscape"
+    return "portrait"
+
+
+def get_orientation(page) -> str:
+    """
+    Determine page orientation by first checking .pf elements, then falling
+    back to overall content dimensions if no pf elements are found.
+    """
+    page.set_viewport_size({"width": A4_LANDSCAPE[0], "height": A4_LANDSCAPE[1]})
+    page.wait_for_selector("body", state="attached")
+
+    # 1. Check .pf elements
+    pf_orientation = _get_pf_orientation(page)
+    if pf_orientation:
+        logger.info(f"Orientation from .pf elements: {pf_orientation}")
+        return pf_orientation
+
+    # 2. Fallback to content dimensions
+    dims = page.evaluate("""() => {
+        // Try elements with page in class name first
+        const pageElements = document.querySelectorAll('[class*="page"]');
+        if (pageElements.length) {
+            const rects = Array.from(pageElements).map(el => el.getBoundingClientRect());
+            const dims = {
+                width: Math.max(...rects.map(r => r.width)),
+                height: Math.max(...rects.map(r => r.height))
+            };
+            if (dims.width >= 400 && dims.height >= 600) {
+                return dims;
+            }
+        }
+
+        // Fallback to document dimensions
+        const doc = document.documentElement;
+        return {
+            width: Math.max(doc.scrollWidth, doc.clientWidth),
+            height: Math.max(doc.scrollHeight, doc.clientHeight)
+        };
+    }""")
+
+    width, height = dims["width"], dims["height"]
+    logger.debug(f"Content dimensions: {width}x{height}")
+
+    if height == 0:
+        logger.info("Height is 0, defaulting to portrait orientation")
+        return "portrait"
+
+    # For reasonable page dimensions, use width/height comparison
+    if width >= 400 and height >= 600:
+        if height > width:
+            logger.info("Content dimensions indicate portrait orientation")
+            return "portrait"
+        logger.info("Content dimensions indicate landscape orientation")
+        return "landscape"
+
+    # For unreasonable dimensions, assume portrait
+    logger.info("Unreasonable dimensions, defaulting to portrait orientation")
+    return "portrait"
+
+
 class DocumentExporter:
-    """
-    Exports XHTML to PDF/JPEG, deciding orientation by:
-      1) Opening with a large viewport (1920×3000) to read natural scrollWidth/scrollHeight.
-      2) If scrollWidth ≥ LANDSCAPE_WIDTH_THRESHOLD => candidate for landscape.
-      3) Then check if scrollHeight/scrollWidth is very large => override to portrait.
-      4) Otherwise choose portrait if under threshold.
-    """
+    """Generate a PDF (or JPEG) from XHTML with determined orientation."""
 
     def __init__(self, input_file: str, export_format: ExportFormat = ExportFormat.PDF):
-        """Initialize document exporter with input XHTML file path and format.
-
-        Args:
-            input_file: Path to input XHTML file
-            export_format: Output format (PDF or JPEG)
-        """
         self.input_file = Path(input_file)
         self.export_format = export_format
         if not self.input_file.exists():
             raise FileNotFoundError(f"Input file not found: {input_file}")
 
     def export(self, output_path: str, jpeg_quality: Optional[int] = None) -> None:
-        """
-        Hybrid approach:
-          1) large viewport => measure scrollWidth, scrollHeight
-          2) if scrollWidth >= 1100 => potential landscape
-          3) but if (scrollHeight/scrollWidth) > 2 => override to portrait
-          4) PDF export with format='A4' or screenshot for JPEG
-        """
-        LANDSCAPE_WIDTH_THRESHOLD = 1100
-        EXTREME_TALL_RATIO = 2.0  # if height is > 2× width, force portrait
-
+        """Load the page, determine orientation, and export."""
         with sync_playwright() as p:
             browser = p.chromium.launch()
-            detect_page = browser.new_page()
-            detect_page.set_viewport_size({"width": 1920, "height": 3000})
-
-            # ------------------- Pass #1: Orientation detection -------------------
-            try:
-                print(f"Loading file: {self.input_file.absolute()}")
-                response = detect_page.goto(f"file://{self.input_file.absolute()}")
-                if response is None:
-                    raise Exception("Failed to load page: No response")
-                if not response.ok:
-                    raise Exception(f"Failed to load page: {response.status}")
-
-                detect_page.wait_for_load_state("networkidle")
-                detect_page.wait_for_load_state("domcontentloaded")
-                detect_page.wait_for_load_state("load")
-
-                scroll_width = detect_page.evaluate(
-                    "document.documentElement.scrollWidth"
-                )
-                scroll_height = detect_page.evaluate(
-                    "document.documentElement.scrollHeight"
-                )
-                print(
-                    f"[Initial Detection] scrollWidth={scroll_width}, scrollHeight={scroll_height}"
-                )
-
-                if scroll_width >= LANDSCAPE_WIDTH_THRESHOLD:
-                    # Candidate for landscape
-                    ratio = float(scroll_height) / float(scroll_width)
-                    if ratio > EXTREME_TALL_RATIO:
-                        # If it's extremely tall, override to portrait
-                        is_landscape = False
-                        reason = (
-                            f"Height/width ratio={ratio:.2f} > {EXTREME_TALL_RATIO}"
-                        )
-                    else:
-                        is_landscape = True
-                        reason = (
-                            f"Within ratio <= {EXTREME_TALL_RATIO}, so keep landscape"
-                        )
-                else:
-                    # Under threshold => definitely portrait
-                    is_landscape = False
-                    reason = f"scrollWidth < {LANDSCAPE_WIDTH_THRESHOLD}px"
-
-                orientation_str = "landscape" if is_landscape else "portrait"
-                print(
-                    f"[Auto-Detection] => Orientation = {orientation_str}, reason: {reason}"
-                )
-
-            except Exception as e:
-                detect_page.close()
-                browser.close()
-                raise Exception(f"Export failed during orientation detection: {e}")
-            detect_page.close()
-
-            # ------------------- Pass #2: Final export -------------------
             page = browser.new_page()
+
             try:
-                print("Reloading for final export...")
-                response = page.goto(f"file://{self.input_file.absolute()}")
-                if response is None:
-                    raise Exception("Failed to load page for final export: No response")
-                if not response.ok:
-                    raise Exception(
-                        f"Failed to load page for final export: {response.status}"
-                    )
-
-                page.wait_for_load_state("networkidle")
+                page.goto(f"file://{self.input_file.absolute()}")
                 page.wait_for_load_state("domcontentloaded")
-                page.wait_for_load_state("load")
+                page.wait_for_load_state("networkidle")
 
-                scale_factor = 0.98
-                print(f"Using final orientation: {orientation_str}")
-                print(f"Using scale factor: {scale_factor:.2f}")
+                orientation = get_orientation(page)
+                logger.info(f"Determined orientation: {orientation}")
+
+                is_landscape = orientation == "landscape"
+                viewport_size = A4_LANDSCAPE if is_landscape else A4_PORTRAIT
+                page.set_viewport_size(
+                    {"width": viewport_size[0], "height": viewport_size[1]}
+                )
 
                 if self.export_format == ExportFormat.PDF:
-                    print(
-                        "Exporting as PDF with format='A4' and no custom width/height..."
-                    )
                     page.pdf(
                         path=output_path,
                         format="A4",
                         landscape=is_landscape,
-                        scale=scale_factor,
+                        scale=0.98,
                         margin={"top": "0", "right": "0", "bottom": "0", "left": "0"},
                         print_background=True,
                         prefer_css_page_size=False,
                     )
                 else:
-                    print("Exporting as JPEG...")
-                    from pathlib import Path
-
-                    output_dir = Path(output_path)
+                    output_dir = Path(output_path).resolve()
                     output_dir.mkdir(parents=True, exist_ok=True)
                     screenshot_options = {
                         "type": "jpeg",
@@ -155,10 +164,9 @@ class DocumentExporter:
                         screenshot_options["quality"] = jpeg_quality
                     page.screenshot(**screenshot_options)
 
-                print("Export completed successfully")
-
-            except Exception as e:
-                raise Exception(f"Export failed during final export: {e}")
+                logger.info(
+                    f"Export completed successfully ({self.export_format.value.upper()})."
+                )
             finally:
                 page.close()
                 browser.close()
@@ -168,21 +176,15 @@ def main():
     """CLI entry point."""
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description=(
-            "Export XHTML to PDF/JPEG with orientation auto-chosen by width threshold + tall ratio override. "
-            "If scrollWidth >= 1100 => candidate landscape, unless it's extremely tall => force portrait."
-        )
-    )
-    parser.add_argument("input_file", help="Input XHTML path")
-    parser.add_argument("output_path", help="Output PDF path or screenshot dir")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("input_file", help="Input XHTML file path")
+    parser.add_argument("output_path", help="Output PDF path or directory (for JPEGs)")
     parser.add_argument(
         "--format",
         "-f",
-        type=ExportFormat,
-        choices=list(ExportFormat),
-        default=ExportFormat.PDF,
-        help="pdf or jpeg",
+        default="pdf",
+        choices=["pdf", "jpeg"],
+        help="Output format: pdf or jpeg",
     )
     parser.add_argument(
         "--quality",
@@ -192,10 +194,10 @@ def main():
         metavar="[1-100]",
         help="JPEG quality if --format=jpeg",
     )
-
     args = parser.parse_args()
 
-    exporter = DocumentExporter(args.input_file, args.format)
+    fmt = ExportFormat.PDF if args.format.lower() == "pdf" else ExportFormat.JPEG
+    exporter = DocumentExporter(args.input_file, fmt)
     exporter.export(args.output_path, jpeg_quality=args.quality)
 
 
