@@ -1,0 +1,58 @@
+/* Page layout optimization */
+@page {
+    -prince-shrink-to-fit: auto;
+    margin: 13mm;
+    margin-inside: 3em;
+}
+
+/* Left/right page spread handling */
+@page:left {
+    margin-right: 3em;
+}
+@page:right {
+    margin-left: 3em;
+}
+
+/* Special handling for large tables */
+@page big_table {
+    -prince-rotate-body: landscape;
+    -prince-shrink-to-fit: auto;
+}
+
+/* Content optimization */
+body {
+    margin: 0;
+    hyphens: auto;
+    text-align: justify;
+}
+
+table {
+    -prince-shrink-to-fit: auto;
+    width: 100%;
+    table-layout: auto;
+}
+
+table.big {
+    page: big_table;
+}
+
+img {
+    -prince-image-magic: recompress-jpeg(85%) snap-to-integer-coords;
+    max-width: 100%;
+    height: auto;
+}
+
+/* Improve text readability */
+p {
+    margin: 1em 0;
+    line-height: 1.4;
+}
+
+/* Handle page breaks better */
+h1, h2, h3 {
+    break-after: avoid;
+}
+
+table, figure {
+    break-inside: avoid;
+}
