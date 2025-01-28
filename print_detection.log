@@ -1,28 +1,26 @@
-2025-01-28 12:49:13,730 - __main__ - DEBUG - [/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_4.xhtml] Checking CSS Print Layout:
-2025-01-28 12:49:13,747 - __main__ - DEBUG -   size: 
-2025-01-28 12:49:13,747 - __main__ - DEBUG -   orientation: 
-2025-01-28 12:49:13,747 - __main__ - DEBUG -   pageBreakBefore: auto
-2025-01-28 12:49:13,747 - __main__ - DEBUG -   pageBreakAfter: auto
-2025-01-28 12:49:13,747 - __main__ - DEBUG - [/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_4.xhtml] Checking @page Rules:
-2025-01-28 12:49:13,754 - __main__ - DEBUG - [/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_4.xhtml] Checking Page Elements:
-2025-01-28 12:49:13,767 - __main__ - DEBUG -   pages: 0 elements found
-2025-01-28 12:49:13,767 - __main__ - DEBUG -   pageBreaks: 0 elements found
-2025-01-28 12:49:13,767 - __main__ - DEBUG -   pageContainers: 0 elements found
-2025-01-28 12:49:13,767 - __main__ - DEBUG - [/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_4.xhtml] Checking Print Media Features:
-2025-01-28 12:49:13,773 - __main__ - DEBUG -   Print Media Supported: False
-2025-01-28 12:49:13,773 - __main__ - DEBUG -   Has Print Stylesheet: False
-2025-01-28 12:49:13,773 - __main__ - DEBUG - [/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_4.xhtml] Checking Chromium Print Settings:
-2025-01-28 12:49:13,796 - __main__ - DEBUG -   Print Settings:
-2025-01-28 12:49:13,796 - __main__ - DEBUG -     Page Rules: []
-2025-01-28 12:49:13,796 - __main__ - DEBUG -     Has Print Stylesheet: False
-2025-01-28 12:49:13,797 - __main__ - DEBUG -     Page Dimensions: {'width': 960, 'height': 110617}
-2025-01-28 12:49:13,797 - __main__ - DEBUG -     Paper Sizes Match: {'A4': {'portrait': False, 'landscape': False}, 'Letter': {'portrait': False, 'landscape': False}, 'Legal': {'portrait': False, 'landscape': False}}
-2025-01-28 12:49:13,797 - __main__ - DEBUG -     Orientation Hints: {'html': {'style': None, 'computed': None}, 'body': {'style': None, 'computed': None}, 'meta': None, 'cssPage': None}
-2025-01-28 12:49:13,797 - __main__ - DEBUG -     Print Elements: {'pageContainers': 0, 'pageBreaks': 0, 'printSections': 0}
-2025-01-28 12:49:13,797 - __main__ - DEBUG -     Viewport Settings: {}
-2025-01-28 12:49:18,496 - __main__ - DEBUG - Parsing HTML content
-2025-01-28 12:49:20,356 - __main__ - DEBUG - [/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_4.xhtml] Content dimensions from [class*="page"]:
-2025-01-28 12:49:20,356 - __main__ - DEBUG -   Raw dimensions: 1125x795
-2025-01-28 12:49:20,357 - __main__ - DEBUG -   Computed dimensions: 1122x793
-2025-01-28 12:49:20,357 - __main__ - DEBUG -   Scroll dimensions: 1123x793
-2025-01-28 12:49:20,357 - __main__ - DEBUG - [/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_4.xhtml] Final dimensions: 1125x795
+2025-01-28 20:49:54,466 - __main__ - DEBUG - [/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_3.xhtml] Checking CSS Print Layout:
+2025-01-28 20:49:54,484 - __main__ - DEBUG -   size: 
+2025-01-28 20:49:54,484 - __main__ - DEBUG -   orientation: 
+2025-01-28 20:49:54,484 - __main__ - DEBUG -   pageBreakBefore: auto
+2025-01-28 20:49:54,484 - __main__ - DEBUG -   pageBreakAfter: auto
+2025-01-28 20:49:54,484 - __main__ - DEBUG - [/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_3.xhtml] Checking @page Rules:
+2025-01-28 20:49:54,506 - __main__ - DEBUG - [/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_3.xhtml] Checking Page Elements:
+2025-01-28 20:49:54,525 - __main__ - DEBUG -   pages: 0 elements found
+2025-01-28 20:49:54,525 - __main__ - DEBUG -   pageBreaks: 0 elements found
+2025-01-28 20:49:54,525 - __main__ - DEBUG -   pageContainers: 0 elements found
+2025-01-28 20:49:54,525 - __main__ - DEBUG - [/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_3.xhtml] Checking Print Media Features:
+2025-01-28 20:49:54,541 - __main__ - DEBUG -   Print Media Supported: False
+2025-01-28 20:49:54,541 - __main__ - DEBUG -   Has Print Stylesheet: False
+2025-01-28 20:49:54,541 - __main__ - DEBUG - [/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_3.xhtml] Checking Chromium Print Settings:
+2025-01-28 20:49:54,582 - __main__ - DEBUG -   Print Settings:
+2025-01-28 20:49:54,582 - __main__ - DEBUG -     Page Rules: []
+2025-01-28 20:49:54,582 - __main__ - DEBUG -     Has Print Stylesheet: False
+2025-01-28 20:49:54,582 - __main__ - DEBUG -     Page Dimensions: {'width': 960, 'height': 248720}
+2025-01-28 20:49:54,582 - __main__ - DEBUG -     Paper Sizes Match: {'A4': {'portrait': False, 'landscape': False}, 'Letter': {'portrait': False, 'landscape': False}, 'Legal': {'portrait': False, 'landscape': False}}
+2025-01-28 20:49:54,582 - __main__ - DEBUG -     Orientation Hints: {'html': {'style': None, 'computed': None}, 'body': {'style': None, 'computed': None}, 'meta': None, 'cssPage': None}
+2025-01-28 20:49:54,582 - __main__ - DEBUG -     Print Elements: {'pageContainers': 0, 'pageBreaks': 0, 'printSections': 0}
+2025-01-28 20:49:54,582 - __main__ - DEBUG -     Viewport Settings: {}
+2025-01-28 20:50:46,095 - __main__ - DEBUG - Parsing HTML content
+2025-01-28 20:50:51,238 - __main__ - DEBUG - [/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_3.xhtml] Content dimensions from document/body:
+2025-01-28 20:50:51,239 - __main__ - DEBUG -   Raw dimensions: 1920x331627
+2025-01-28 20:50:51,239 - __main__ - DEBUG - [/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_3.xhtml] Final dimensions: 1920x331627

@@ -552,8 +552,8 @@ if __name__ == "__main__":
         # "/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_0.xhtml",
         # "/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_1.xhtml",
         # "/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_2.xhtml",
-        # "/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_3.xhtml",
-        "/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_4.xhtml",
+        "/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_3.xhtml",
+        # "/Users/jakit/simonas/projects/xhtml-pdf/assets/xhtml/sample_4.xhtml",
     ]
 
     for xhtml_file in xhtmls_files:

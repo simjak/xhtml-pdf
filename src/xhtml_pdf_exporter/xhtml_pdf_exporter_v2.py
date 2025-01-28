@@ -183,6 +183,7 @@ class DocumentExporterAsync:
         jpeg_quality: Optional[int] = None,
         max_pages_guess: int = 500,
         batch_size: int = 10,
+        split_threshold_size_mb: int = 50,
     ) -> None:
         """
         Load the page, determine orientation, and export (async).
@@ -197,6 +198,10 @@ class DocumentExporterAsync:
             "--disable-breakpad",
             "--disable-crash-reporter",
         ]
+
+        input_filesize_bytes = self.input_file.stat().st_size
+        threshold_bytes = split_threshold_size_mb * 1024 * 1024
+        do_batch_print = input_filesize_bytes > threshold_bytes
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True, args=chromium_launch_args)
@@ -364,6 +369,12 @@ async def main_async() -> None:
         default=10,
         help="Number of pages per batch (only used for PDF).",
     )
+    parser.add_argument(
+        "--split-threshold-mb",
+        type=int,
+        default=50,
+        help="If input file size (MB) is larger, use multiple batches. Otherwise, just one batch.",
+    )
     args = parser.parse_args()
 
     fmt = ExportFormat.PDF if args.format.lower() == "pdf" else ExportFormat.JPEG
@@ -373,6 +384,7 @@ async def main_async() -> None:
         jpeg_quality=args.quality,
         max_pages_guess=args.max_pages_guess,
         batch_size=args.batch_size,
+        split_threshold_size_mb=args.split_threshold_mb,
     )
 
 
