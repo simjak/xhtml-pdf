@@ -12,12 +12,9 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
-# For merging PDFs
-# pip install PyPDF2
 import PyPDF2
 from playwright.async_api import async_playwright
 
-# Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -64,24 +61,11 @@ async def _get_pf_orientation_async(page) -> Optional[str]:
     return "portrait"
 
 
-async def get_orientation_async(page) -> str:
+async def get_content_dimensions_async(page) -> dict:
     """
-    Determine page orientation by first checking .pf elements, then falling
-    back to overall content dimensions if no pf elements are found.
+    Get accurate content dimensions by checking multiple methods.
+    Returns a dict with width and height.
     """
-    page.set_default_timeout(60000)  # 60 seconds for selectors
-    page.set_default_navigation_timeout(60000)
-
-    await page.set_viewport_size({"width": A4_LANDSCAPE[0], "height": A4_LANDSCAPE[1]})
-    await page.wait_for_selector("body", state="attached")
-
-    # 1. Check .pf elements
-    pf_orientation = await _get_pf_orientation_async(page)
-    if pf_orientation:
-        logger.info(f"Orientation from .pf elements: {pf_orientation}")
-        return pf_orientation
-
-    # 2. Fallback to content dimensions
     dims = await page.evaluate(
         """() => {
             // Try elements with 'page' in class name first
@@ -97,11 +81,35 @@ async def get_orientation_async(page) -> str:
                 }
             }
 
+            // Try .pf elements (PDF containers)
+            const pfElements = document.querySelectorAll('.pf');
+            if (pfElements.length) {
+                const rects = Array.from(pfElements).map(el => el.getBoundingClientRect());
+                const dims = {
+                    width: Math.max(...rects.map(r => r.width)),
+                    height: Math.max(...rects.map(r => r.height))
+                };
+                if (dims.width >= 400 && dims.height >= 600) {
+                    return dims;
+                }
+            }
+
             // Fallback to document dimensions
             const doc = document.documentElement;
+            const body = document.body;
             return {
-                width: Math.max(doc.scrollWidth, doc.clientWidth),
-                height: Math.max(doc.scrollHeight, doc.clientHeight)
+                width: Math.max(
+                    doc.scrollWidth,
+                    doc.clientWidth,
+                    body ? body.scrollWidth : 0,
+                    body ? body.clientWidth : 0
+                ),
+                height: Math.max(
+                    doc.scrollHeight,
+                    doc.clientHeight,
+                    body ? body.scrollHeight : 0,
+                    body ? body.clientHeight : 0
+                )
             };
         }"""
     )
@@ -113,6 +121,30 @@ async def get_orientation_async(page) -> str:
     logger.debug(f"[Dimensions] Raw dimensions: {width}x{height}")
     logger.debug(f"[Dimensions] Width/Height ratio: {width / height:.4f}")
     logger.debug(f"[Dimensions] Aspect ratio (height/width): {height / width:.4f}")
+
+    return dims
+
+async def get_orientation_async(page) -> str:
+    """
+    Determine page orientation by first checking .pf elements, then falling
+    back to overall content dimensions if no pf elements are found.
+    """
+    page.set_default_timeout(60000)  # 60 seconds for selectors
+    page.set_default_navigation_timeout(60000)
+
+    # await page.set_viewport_size({"width": A4_LANDSCAPE[0], "height": A4_LANDSCAPE[1]})
+    await page.wait_for_selector("body", state="attached")
+
+    # 1. Check .pf elements
+    pf_orientation = await _get_pf_orientation_async(page)
+    if pf_orientation:
+        logger.info(f"Orientation from .pf elements: {pf_orientation}")
+        return pf_orientation
+
+    # 2. Get content dimensions
+    dims = await get_content_dimensions_async(page)
+    width = dims["width"]
+    height = dims["height"]
 
     if height == 0:
         logger.debug("[Dimensions] Zero height detected")
@@ -205,11 +237,9 @@ class DocumentExporterAsync:
     async def export(
         self,
         output_path: str,
-        jpeg_quality: Optional[int] = None,
         max_pages_guess: int = 500,
         batch_size: int = 10,
         split_threshold_size_mb: int = 50,
-        forced_orientation: Optional[str] = None,
         timeout_seconds: int = 300,
     ) -> None:
         """
@@ -256,71 +286,6 @@ class DocumentExporterAsync:
                 logger.info(f"Determined orientation: {orientation}")
                 is_landscape = orientation == "landscape"
 
-                if self.export_format == ExportFormat.JPEG:
-                    output_dir = Path(output_path).resolve()
-                    output_dir.mkdir(parents=True, exist_ok=True)
-
-                    for page_range in generate_batch_ranges(1, max_pages_guess, 1):  # One page at a time
-                        page_num = int(page_range.split('-')[0])  # Get single page number
-                        logger.info(f"Exporting JPEG for page {page_num}")
-
-                        # Create new page for each screenshot to prevent memory issues
-                        page_jpeg = await browser.new_page()
-
-                        # Set viewport based on orientation
-                        if is_landscape:
-                            await page_jpeg.set_viewport_size(
-                                {"width": A4_LANDSCAPE[0], "height": A4_LANDSCAPE[1]}
-                            )
-                        else:
-                            await page_jpeg.set_viewport_size(
-                                {"width": A4_PORTRAIT[0], "height": A4_PORTRAIT[1]}
-                            )
-
-                        try:
-                            # Load the page with specific page range
-                            await page_jpeg.goto(
-                                f"file://{self.input_file.absolute()}",
-                                timeout=nav_timeout_ms,
-                                wait_until="domcontentloaded",
-                            )
-
-                            # Configure screenshot options
-                            screenshot_options = {
-                                "type": "jpeg",
-                                "path": str(output_dir / f"page_{page_num:03d}.jpg"),
-                                "full_page": True,
-                            }
-                            if jpeg_quality is not None:
-                                screenshot_options["quality"] = jpeg_quality
-
-                            # Take screenshot for this page
-                            await page_jpeg.evaluate(f"document.querySelector('.pf').style.display = 'block'; Array.from(document.querySelectorAll('.pf')).forEach((el, idx) => {{ if(idx !== {page_num - 1}) el.style.display = 'none'; }});")
-                            await page_jpeg.screenshot(**screenshot_options)
-
-                        except Exception as exc:
-                            logger.error(f"Failed to export page {page_num}: {exc}")
-                            await page_jpeg.close()
-                            if "Page range exceeds page count" in str(exc):
-                                logger.info(f"No more pages after {page_num-1}, stopping export.")
-                                break
-                            raise
-
-                        await page_jpeg.close()
-
-                        # Check if the exported file exists and has content
-                        output_file = output_dir / f"page_{page_num:03d}.jpg"
-                        if not output_file.exists() or output_file.stat().st_size < 1024:
-                            logger.info(f"Page {page_num} produced no output, assuming end of document.")
-                            try:
-                                output_file.unlink(missing_ok=True)
-                            except OSError:
-                                pass
-                            break
-
-                    logger.info("JPEG export completed successfully.")
-                    return
-
                 # If PDF, either do a single print or batch printing based on file size
                 if not do_batch_print:
                     # Single print for smaller files
@@ -345,21 +310,28 @@ class DocumentExporterAsync:
                         wait_until="domcontentloaded",
                     )
 
+                    # Get content dimensions for scaling
+                    dims = await get_content_dimensions_async(page_pdf)
+                    content_width = dims["width"]
+                    target_width = A4_LANDSCAPE[0] if is_landscape else A4_PORTRAIT[0]
+                    scale_factor = min(target_width / content_width, 1.0)  # Never scale up
+                    logger.info(f"Using scale factor: {scale_factor:.4f} (content width: {content_width}px, target width: {target_width}px)")
+
                     # Print entire document at once
                     try:
                         await page_pdf.pdf(
                             path=output_path,
                             format="A4",
                             landscape=is_landscape,
-                            scale=0.98,
+                            scale=scale_factor,
                             margin={
-                                "top": "0",
-                                "right": "0",
-                                "bottom": "0",
-                                "left": "0",
+                                "top": "10mm",
+                                "right": "10mm",
+                                "bottom": "10mm",
+                                "left": "10mm",
                             },
                             print_background=True,
-                            prefer_css_page_size=False,
+                            prefer_css_page_size=True,
                         )
                         logger.info("Export completed (PDF) in single print.")
                     except Exception as exc:
@@ -403,21 +375,28 @@ class DocumentExporterAsync:
                             wait_until="domcontentloaded",
                         )
 
+                        # Get content dimensions for scaling
+                        dims = await get_content_dimensions_async(page_pdf)
+                        content_width = dims["width"]
+                        target_width = A4_LANDSCAPE[0] if is_landscape else A4_PORTRAIT[0]
+                        scale_factor = min(target_width / content_width, 1.0)  # Never scale up
+                        logger.info(f"Using scale factor: {scale_factor:.4f} (content width: {content_width}px, target width: {target_width}px)")
+
                         # Attempt to print only the specified batch range
                         try:
                             await page_pdf.pdf(
                                 path=partial_pdf,
                                 format="A4",
                                 landscape=is_landscape,
-                                scale=0.98,
+                                scale=scale_factor,
                                 margin={
-                                    "top": "0",
-                                    "right": "0",
-                                    "bottom": "0",
-                                    "left": "0",
+                                    "top": "10mm",
+                                    "right": "10mm",
+                                    "bottom": "10mm",
+                                    "left": "10mm",
                                 },
                                 print_background=True,
-                                prefer_css_page_size=False,
+                                prefer_css_page_size=True,
                                 page_ranges=page_range,
                             )
                         except Exception as exc:
@@ -471,22 +450,7 @@ async def main_async() -> None:
     """CLI entry point for async version."""
     parser = argparse.ArgumentParser()
     parser.add_argument("input_file", help="Input XHTML file path")
-    parser.add_argument("output_path", help="Output PDF path or directory (for JPEGs)")
-    parser.add_argument(
-        "--format",
-        "-f",
-        default="pdf",
-        choices=["pdf", "jpeg"],
-        help="Output format: pdf or jpeg",
-    )
-    parser.add_argument(
-        "--quality",
-        "-q",
-        type=int,
-        choices=range(1, 101),
-        metavar="[1-100]",
-        help="JPEG quality if --format=jpeg",
-    )
+    parser.add_argument("output_path", help="Output PDF path")
     parser.add_argument(
         "--max-pages-guess",
         type=int,
@@ -513,11 +477,9 @@ async def main_async() -> None:
     )
     args = parser.parse_args()
 
-    fmt = ExportFormat.PDF if args.format.lower() == "pdf" else ExportFormat.JPEG
-    exporter = DocumentExporterAsync(args.input_file, fmt)
+    exporter = DocumentExporterAsync(args.input_file)
     await exporter.export(
         output_path=args.output_path,
-        jpeg_quality=args.quality,
         max_pages_guess=args.max_pages_guess,
         batch_size=args.batch_size,
         split_threshold_size_mb=args.split_threshold_mb,
