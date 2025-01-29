@@ -18,7 +18,7 @@ import PyPDF2
 from playwright.async_api import async_playwright
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -108,21 +108,46 @@ async def get_orientation_async(page) -> str:
 
     width = dims["width"]
     height = dims["height"]
-    logger.debug(f"Content dimensions: {width}x{height}")
+
+    # Log detailed dimension information
+    logger.debug(f"[Dimensions] Raw dimensions: {width}x{height}")
+    logger.debug(f"[Dimensions] Width/Height ratio: {width / height:.4f}")
+    logger.debug(f"[Dimensions] Aspect ratio (height/width): {height / width:.4f}")
 
     if height == 0:
+        logger.debug("[Dimensions] Zero height detected")
         logger.info("Height is 0, defaulting to portrait orientation")
         return "portrait"
 
     # For reasonable page dimensions, use width/height comparison
     if width >= 400 and height >= 600:
+        logger.debug(
+            f"[Dimensions] Meets minimum size requirements: width >= 400 ({width >= 400}), height >= 600 ({height >= 600})"
+        )
+
+        # Check for very wide and tall content
+        if width > 1000 and height > 100000:
+            logger.debug(
+                f"[Dimensions] Large content detected: width > 1000 ({width > 1000}), height > 100000 ({height > 100000})"
+            )
+            logger.info(
+                "Content dimensions indicate landscape orientation (large content)"
+            )
+            return "landscape"
+
         if height > width:
+            logger.debug(f"[Dimensions] Height > Width comparison: {height} > {width}")
             logger.info("Content dimensions indicate portrait orientation")
             return "portrait"
+
+        logger.debug(f"[Dimensions] Width >= Height comparison: {width} >= {height}")
         logger.info("Content dimensions indicate landscape orientation")
         return "landscape"
 
     # For unreasonable dimensions, assume portrait
+    logger.debug(
+        f"[Dimensions] Unreasonable dimensions: width < 400 ({width < 400}) or height < 600 ({height < 600})"
+    )
     logger.info("Unreasonable dimensions, defaulting to portrait orientation")
     return "portrait"
 
@@ -184,6 +209,8 @@ class DocumentExporterAsync:
         max_pages_guess: int = 500,
         batch_size: int = 10,
         split_threshold_size_mb: int = 50,
+        forced_orientation: Optional[str] = None,
+        timeout_seconds: int = 300,
     ) -> None:
         """
         Load the page, determine orientation, and export (async).
@@ -201,7 +228,13 @@ class DocumentExporterAsync:
 
         input_filesize_bytes = self.input_file.stat().st_size
         threshold_bytes = split_threshold_size_mb * 1024 * 1024
+        logger.info(f"Input file size: {input_filesize_bytes / 1024 / 1024:.2f} MB")
+        logger.info(f"Split threshold: {threshold_bytes / 1024 / 1024:.2f} MB")
         do_batch_print = input_filesize_bytes > threshold_bytes
+        logger.info(f"Do batch print: {do_batch_print}")
+
+        # Convert the given timeout in seconds to milliseconds
+        nav_timeout_ms = timeout_seconds * 1000
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True, args=chromium_launch_args)
@@ -209,11 +242,11 @@ class DocumentExporterAsync:
                 # Open an initial page to determine orientation, then close it.
                 # We'll re-open a fresh page for each batch if PDF.
                 orientation_page = await browser.new_page()
-                orientation_page.set_default_timeout(120000)
-                orientation_page.set_default_navigation_timeout(120000)
+                orientation_page.set_default_timeout(nav_timeout_ms)
+                orientation_page.set_default_navigation_timeout(nav_timeout_ms)
                 await orientation_page.goto(
                     f"file://{self.input_file.absolute()}",
-                    timeout=120000,
+                    timeout=nav_timeout_ms,
                     wait_until="domcontentloaded",
                 )
 
@@ -224,47 +257,78 @@ class DocumentExporterAsync:
                 is_landscape = orientation == "landscape"
 
                 if self.export_format == ExportFormat.JPEG:
-                    # Just do a one-shot screenshot
-                    page_jpeg = await browser.new_page()
-                    if is_landscape:
-                        await page_jpeg.set_viewport_size(
-                            {"width": A4_LANDSCAPE[0], "height": A4_LANDSCAPE[1]}
-                        )
-                    else:
-                        await page_jpeg.set_viewport_size(
-                            {"width": A4_PORTRAIT[0], "height": A4_PORTRAIT[1]}
-                        )
-                    await page_jpeg.goto(
-                        f"file://{self.input_file.absolute()}",
-                        timeout=120000,
-                        wait_until="domcontentloaded",
-                    )
                     output_dir = Path(output_path).resolve()
                     output_dir.mkdir(parents=True, exist_ok=True)
-                    screenshot_options = {
-                        "type": "jpeg",
-                        "path": str(output_dir / "page_001.jpg"),
-                        "full_page": True,
-                    }
-                    if jpeg_quality is not None:
-                        screenshot_options["quality"] = jpeg_quality
-                    await page_jpeg.screenshot(**screenshot_options)
-                    await page_jpeg.close()
-                    logger.info("Export completed successfully (JPEG).")
+
+                    for page_range in generate_batch_ranges(1, max_pages_guess, 1):  # One page at a time
+                        page_num = int(page_range.split('-')[0])  # Get single page number
+                        logger.info(f"Exporting JPEG for page {page_num}")
+
+                        # Create new page for each screenshot to prevent memory issues
+                        page_jpeg = await browser.new_page()
+
+                        # Set viewport based on orientation
+                        if is_landscape:
+                            await page_jpeg.set_viewport_size(
+                                {"width": A4_LANDSCAPE[0], "height": A4_LANDSCAPE[1]}
+                            )
+                        else:
+                            await page_jpeg.set_viewport_size(
+                                {"width": A4_PORTRAIT[0], "height": A4_PORTRAIT[1]}
+                            )
+
+                        try:
+                            # Load the page with specific page range
+                            await page_jpeg.goto(
+                                f"file://{self.input_file.absolute()}",
+                                timeout=nav_timeout_ms,
+                                wait_until="domcontentloaded",
+                            )
+
+                            # Configure screenshot options
+                            screenshot_options = {
+                                "type": "jpeg",
+                                "path": str(output_dir / f"page_{page_num:03d}.jpg"),
+                                "full_page": True,
+                            }
+                            if jpeg_quality is not None:
+                                screenshot_options["quality"] = jpeg_quality
+
+                            # Take screenshot for this page
+                            await page_jpeg.evaluate(f"document.querySelector('.pf').style.display = 'block'; Array.from(document.querySelectorAll('.pf')).forEach((el, idx) => {{ if(idx !== {page_num - 1}) el.style.display = 'none'; }});")
+                            await page_jpeg.screenshot(**screenshot_options)
+
+                        except Exception as exc:
+                            logger.error(f"Failed to export page {page_num}: {exc}")
+                            await page_jpeg.close()
+                            if "Page range exceeds page count" in str(exc):
+                                logger.info(f"No more pages after {page_num-1}, stopping export.")
+                                break
+                            raise
+
+                        await page_jpeg.close()
+
+                        # Check if the exported file exists and has content
+                        output_file = output_dir / f"page_{page_num:03d}.jpg"
+                        if not output_file.exists() or output_file.stat().st_size < 1024:
+                            logger.info(f"Page {page_num} produced no output, assuming end of document.")
+                            try:
+                                output_file.unlink(missing_ok=True)
+                            except OSError:
+                                pass
+                            break
+
+                    logger.info("JPEG export completed successfully.")
                     return
 
-                # If PDF, do batch printing using fresh pages each time.
-                partial_files = []
-                for page_range in generate_batch_ranges(1, max_pages_guess, batch_size):
-                    partial_pdf = f"{output_path}.part_{page_range.replace('-', '_')}"
-                    logger.info(f"Printing PDF for pages {page_range} -> {partial_pdf}")
-
-                    # Open a new page for just this batch
+                # If PDF, either do a single print or batch printing based on file size
+                if not do_batch_print:
+                    # Single print for smaller files
                     page_pdf = await browser.new_page()
-                    page_pdf.set_default_timeout(120000)
-                    page_pdf.set_default_navigation_timeout(120000)
+                    page_pdf.set_default_timeout(nav_timeout_ms)
+                    page_pdf.set_default_navigation_timeout(nav_timeout_ms)
 
-                    # Set accordingly
+                    # Set viewport size based on orientation
                     if is_landscape:
                         await page_pdf.set_viewport_size(
                             {"width": A4_LANDSCAPE[0], "height": A4_LANDSCAPE[1]}
@@ -274,17 +338,17 @@ class DocumentExporterAsync:
                             {"width": A4_PORTRAIT[0], "height": A4_PORTRAIT[1]}
                         )
 
-                    # Tolerate slow loads
+                    # Load the page
                     await page_pdf.goto(
                         f"file://{self.input_file.absolute()}",
-                        timeout=120000,
+                        timeout=nav_timeout_ms,
                         wait_until="domcontentloaded",
                     )
 
-                    # Now print only the specified batch range
+                    # Print entire document at once
                     try:
                         await page_pdf.pdf(
-                            path=partial_pdf,
+                            path=output_path,
                             format="A4",
                             landscape=is_landscape,
                             scale=0.98,
@@ -296,38 +360,104 @@ class DocumentExporterAsync:
                             },
                             print_background=True,
                             prefer_css_page_size=False,
-                            page_ranges=page_range,
                         )
+                        logger.info("Export completed (PDF) in single print.")
                     except Exception as exc:
-                        logger.error(f"Batch {page_range} failed: {exc}")
-                        # Important to still close the page
+                        logger.error(f"PDF generation failed: {exc}")
                         await page_pdf.close()
                         raise
 
                     await page_pdf.close()
-
-                    if (
-                        not os.path.exists(partial_pdf)
-                        or os.path.getsize(partial_pdf) < 1024
-                    ):
-                        logger.info(
-                            f"Batch {page_range} produced minimal or no output; assuming end of document."
-                        )
-                        try:
-                            os.remove(partial_pdf)
-                        except OSError:
-                            pass
-                        break
-
-                    partial_files.append(partial_pdf)
-
-                if partial_files:
-                    merge_pdfs(output_path, partial_files)
-                    logger.info(
-                        f"Export completed (PDF) with {len(partial_files)} batch(es)."
-                    )
                 else:
-                    logger.info("No PDF output was generated at all.")
+                    # Batch printing for larger files
+                    partial_files = []
+                    for page_range in generate_batch_ranges(
+                        1, max_pages_guess, batch_size
+                    ):
+                        partial_pdf = (
+                            f"{output_path}.part_{page_range.replace('-', '_')}"
+                        )
+                        logger.info(
+                            f"Printing PDF for pages {page_range} -> {partial_pdf}"
+                        )
+
+                        # Open a new page for just this batch
+                        page_pdf = await browser.new_page()
+                        page_pdf.set_default_timeout(nav_timeout_ms)
+                        page_pdf.set_default_navigation_timeout(nav_timeout_ms)
+
+                        # Set accordingly
+                        if is_landscape:
+                            await page_pdf.set_viewport_size(
+                                {"width": A4_LANDSCAPE[0], "height": A4_LANDSCAPE[1]}
+                            )
+                        else:
+                            await page_pdf.set_viewport_size(
+                                {"width": A4_PORTRAIT[0], "height": A4_PORTRAIT[1]}
+                            )
+
+                        # Tolerate slow loads
+                        await page_pdf.goto(
+                            f"file://{self.input_file.absolute()}",
+                            timeout=nav_timeout_ms,
+                            wait_until="domcontentloaded",
+                        )
+
+                        # Attempt to print only the specified batch range
+                        try:
+                            await page_pdf.pdf(
+                                path=partial_pdf,
+                                format="A4",
+                                landscape=is_landscape,
+                                scale=0.98,
+                                margin={
+                                    "top": "0",
+                                    "right": "0",
+                                    "bottom": "0",
+                                    "left": "0",
+                                },
+                                print_background=True,
+                                prefer_css_page_size=False,
+                                page_ranges=page_range,
+                            )
+                        except Exception as exc:
+                            # Gracefully handle "page range exceeds page count" errors
+                            if "Page range exceeds page count" in str(exc):
+                                logger.info(
+                                    f"Batch {page_range} goes beyond the final page. Stopping early."
+                                )
+                                await page_pdf.close()
+                                break
+                            else:
+                                logger.error(f"Batch {page_range} failed: {exc}")
+                                await page_pdf.close()
+                                raise
+
+                        await page_pdf.close()
+
+                        # If there's no partial PDF or it's empty, we assume we've reached the end
+                        if (
+                            not os.path.exists(partial_pdf)
+                            or os.path.getsize(partial_pdf) < 1024
+                        ):
+                            logger.info(
+                                f"Batch {page_range} produced minimal or no output; assuming end of document."
+                            )
+                            try:
+                                os.remove(partial_pdf)
+                            except OSError:
+                                pass
+                            break
+
+                        partial_files.append(partial_pdf)
+
+                    if partial_files:
+                        merge_pdfs(output_path, partial_files)
+                        logger.info(
+                            f"Export completed (PDF) with {len(partial_files)} batch(es)."
+                        )
+                    else:
+                        logger.info("No PDF output was generated at all.")
 
             except Exception as exc:
                 logger.error(f"Export failed with error: {exc}", exc_info=True)
@@ -360,13 +490,13 @@ async def main_async() -> None:
     parser.add_argument(
         "--max-pages-guess",
         type=int,
-        default=50,
+        default=1000,
         help="Maximum number of pages to try printing in total.",
     )
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=10,
+        default=20,
         help="Number of pages per batch (only used for PDF).",
     )
     parser.add_argument(
@@ -374,6 +504,12 @@ async def main_async() -> None:
         type=int,
         default=50,
         help="If input file size (MB) is larger, use multiple batches. Otherwise, just one batch.",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=300,
+        help="Timeout in seconds for loading the page (default 300).",
     )
     args = parser.parse_args()
 
@@ -385,6 +521,7 @@ async def main_async() -> None:
         max_pages_guess=args.max_pages_guess,
         batch_size=args.batch_size,
         split_threshold_size_mb=args.split_threshold_mb,
+        timeout_seconds=args.timeout,
     )
 
 
