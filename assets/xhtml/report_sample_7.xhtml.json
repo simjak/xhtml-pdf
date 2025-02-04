@@ -1,0 +1,381 @@
+{
+  "document_info": {
+    "total_pages": 12,
+    "style_type": null,
+    "has_xbrl": false
+  },
+  "pages": [
+    {
+      "number": 1,
+      "type": "pf",
+      "dimensions": {
+        "width": "793.76pt",
+        "height": "1122.56pt",
+        "orientation": "portrait"
+      },
+      "content": {
+        "tag_counts": {
+          "{http://www.w3.org/1999/xhtml}div": 24,
+          "{http://www.w3.org/1999/xhtml}img": 1,
+          "{http://www.w3.org/1999/xhtml}span": 84
+        },
+        "container_hierarchy": [
+          "html",
+          "body",
+          "div",
+          "div.pf.w0.h0"
+        ],
+        "style_rules": {
+          "margin": "13px auto",
+          "box-shadow": "1px 1px 3px 1px #333",
+          "page-break-after": "always",
+          "page-break-inside": "avoid",
+          "/* Needed by IE to make box-shadow works * https": "//developer.mozilla.org/en-US/docs/Web/CSS/box-shadow */\n    border-collapse: separate",
+          "width": "793.760000pt",
+          "height": "1122.560000pt"
+        }
+      }
+    },
+    {
+      "number": 2,
+      "type": "pf",
+      "dimensions": {
+        "width": "793.76pt",
+        "height": "1122.56pt",
+        "orientation": "portrait"
+      },
+      "content": {
+        "tag_counts": {
+          "{http://www.w3.org/1999/xhtml}div": 49,
+          "{http://www.w3.org/1999/xhtml}img": 1,
+          "{http://www.w3.org/1999/xhtml}span": 609
+        },
+        "container_hierarchy": [
+          "html",
+          "body",
+          "div",
+          "div.pf.w0.h0"
+        ],
+        "style_rules": {
+          "margin": "13px auto",
+          "box-shadow": "1px 1px 3px 1px #333",
+          "page-break-after": "always",
+          "page-break-inside": "avoid",
+          "/* Needed by IE to make box-shadow works * https": "//developer.mozilla.org/en-US/docs/Web/CSS/box-shadow */\n    border-collapse: separate",
+          "width": "793.760000pt",
+          "height": "1122.560000pt"
+        }
+      }
+    },
+    {
+      "number": 3,
+      "type": "pf",
+      "dimensions": {
+        "width": "793.76pt",
+        "height": "1122.56pt",
+        "orientation": "portrait"
+      },
+      "content": {
+        "tag_counts": {
+          "{http://www.w3.org/1999/xhtml}div": 52,
+          "{http://www.w3.org/1999/xhtml}img": 1,
+          "{http://www.w3.org/1999/xhtml}span": 1001
+        },
+        "container_hierarchy": [
+          "html",
+          "body",
+          "div",
+          "div.pf.w0.h0"
+        ],
+        "style_rules": {
+          "margin": "13px auto",
+          "box-shadow": "1px 1px 3px 1px #333",
+          "page-break-after": "always",
+          "page-break-inside": "avoid",
+          "/* Needed by IE to make box-shadow works * https": "//developer.mozilla.org/en-US/docs/Web/CSS/box-shadow */\n    border-collapse: separate",
+          "width": "793.760000pt",
+          "height": "1122.560000pt"
+        }
+      }
+    },
+    {
+      "number": 4,
+      "type": "pf",
+      "dimensions": {
+        "width": "793.76pt",
+        "height": "1122.56pt",
+        "orientation": "portrait"
+      },
+      "content": {
+        "tag_counts": {
+          "{http://www.w3.org/1999/xhtml}div": 90,
+          "{http://www.w3.org/1999/xhtml}img": 1,
+          "{http://www.w3.org/1999/xhtml}span": 805
+        },
+        "container_hierarchy": [
+          "html",
+          "body",
+          "div",
+          "div.pf.w0.h0"
+        ],
+        "style_rules": {
+          "margin": "13px auto",
+          "box-shadow": "1px 1px 3px 1px #333",
+          "page-break-after": "always",
+          "page-break-inside": "avoid",
+          "/* Needed by IE to make box-shadow works * https": "//developer.mozilla.org/en-US/docs/Web/CSS/box-shadow */\n    border-collapse: separate",
+          "width": "793.760000pt",
+          "height": "1122.560000pt"
+        }
+      }
+    },
+    {
+      "number": 5,
+      "type": "pf",
+      "dimensions": {
+        "width": "793.76pt",
+        "height": "1122.56pt",
+        "orientation": "portrait"
+      },
+      "content": {
+        "tag_counts": {
+          "{http://www.w3.org/1999/xhtml}div": 89,
+          "{http://www.w3.org/1999/xhtml}img": 1,
+          "{http://www.w3.org/1999/xhtml}span": 938
+        },
+        "container_hierarchy": [
+          "html",
+          "body",
+          "div",
+          "div.pf.w0.h0"
+        ],
+        "style_rules": {
+          "margin": "13px auto",
+          "box-shadow": "1px 1px 3px 1px #333",
+          "page-break-after": "always",
+          "page-break-inside": "avoid",
+          "/* Needed by IE to make box-shadow works * https": "//developer.mozilla.org/en-US/docs/Web/CSS/box-shadow */\n    border-collapse: separate",
+          "width": "793.760000pt",
+          "height": "1122.560000pt"
+        }
+      }
+    },
+    {
+      "number": 6,
+      "type": "pf",
+      "dimensions": {
+        "width": "793.76pt",
+        "height": "1122.56pt",
+        "orientation": "portrait"
+      },
+      "content": {
+        "tag_counts": {
+          "{http://www.w3.org/1999/xhtml}div": 62,
+          "{http://www.w3.org/1999/xhtml}img": 1,
+          "{http://www.w3.org/1999/xhtml}span": 1113
+        },
+        "container_hierarchy": [
+          "html",
+          "body",
+          "div",
+          "div.pf.w0.h0"
+        ],
+        "style_rules": {
+          "margin": "13px auto",
+          "box-shadow": "1px 1px 3px 1px #333",
+          "page-break-after": "always",
+          "page-break-inside": "avoid",
+          "/* Needed by IE to make box-shadow works * https": "//developer.mozilla.org/en-US/docs/Web/CSS/box-shadow */\n    border-collapse: separate",
+          "width": "793.760000pt",
+          "height": "1122.560000pt"
+        }
+      }
+    },
+    {
+      "number": 7,
+      "type": "pf",
+      "dimensions": {
+        "width": "793.76pt",
+        "height": "1122.56pt",
+        "orientation": "portrait"
+      },
+      "content": {
+        "tag_counts": {
+          "{http://www.w3.org/1999/xhtml}div": 62,
+          "{http://www.w3.org/1999/xhtml}img": 1,
+          "{http://www.w3.org/1999/xhtml}span": 1080
+        },
+        "container_hierarchy": [
+          "html",
+          "body",
+          "div",
+          "div.pf.w0.h0"
+        ],
+        "style_rules": {
+          "margin": "13px auto",
+          "box-shadow": "1px 1px 3px 1px #333",
+          "page-break-after": "always",
+          "page-break-inside": "avoid",
+          "/* Needed by IE to make box-shadow works * https": "//developer.mozilla.org/en-US/docs/Web/CSS/box-shadow */\n    border-collapse: separate",
+          "width": "793.760000pt",
+          "height": "1122.560000pt"
+        }
+      }
+    },
+    {
+      "number": 8,
+      "type": "pf",
+      "dimensions": {
+        "width": "793.76pt",
+        "height": "1122.56pt",
+        "orientation": "portrait"
+      },
+      "content": {
+        "tag_counts": {
+          "{http://www.w3.org/1999/xhtml}div": 63,
+          "{http://www.w3.org/1999/xhtml}img": 1,
+          "{http://www.w3.org/1999/xhtml}span": 916
+        },
+        "container_hierarchy": [
+          "html",
+          "body",
+          "div",
+          "div.pf.w0.h0"
+        ],
+        "style_rules": {
+          "margin": "13px auto",
+          "box-shadow": "1px 1px 3px 1px #333",
+          "page-break-after": "always",
+          "page-break-inside": "avoid",
+          "/* Needed by IE to make box-shadow works * https": "//developer.mozilla.org/en-US/docs/Web/CSS/box-shadow */\n    border-collapse: separate",
+          "width": "793.760000pt",
+          "height": "1122.560000pt"
+        }
+      }
+    },
+    {
+      "number": 9,
+      "type": "pf",
+      "dimensions": {
+        "width": "793.76pt",
+        "height": "1122.56pt",
+        "orientation": "portrait"
+      },
+      "content": {
+        "tag_counts": {
+          "{http://www.w3.org/1999/xhtml}div": 63,
+          "{http://www.w3.org/1999/xhtml}img": 1,
+          "{http://www.w3.org/1999/xhtml}span": 933
+        },
+        "container_hierarchy": [
+          "html",
+          "body",
+          "div",
+          "div.pf.w0.h0"
+        ],
+        "style_rules": {
+          "margin": "13px auto",
+          "box-shadow": "1px 1px 3px 1px #333",
+          "page-break-after": "always",
+          "page-break-inside": "avoid",
+          "/* Needed by IE to make box-shadow works * https": "//developer.mozilla.org/en-US/docs/Web/CSS/box-shadow */\n    border-collapse: separate",
+          "width": "793.760000pt",
+          "height": "1122.560000pt"
+        }
+      }
+    },
+    {
+      "number": 10,
+      "type": "pf",
+      "dimensions": {
+        "width": "793.76pt",
+        "height": "1122.56pt",
+        "orientation": "portrait"
+      },
+      "content": {
+        "tag_counts": {
+          "{http://www.w3.org/1999/xhtml}div": 63,
+          "{http://www.w3.org/1999/xhtml}img": 1,
+          "{http://www.w3.org/1999/xhtml}span": 1064
+        },
+        "container_hierarchy": [
+          "html",
+          "body",
+          "div",
+          "div.pf.w0.h0"
+        ],
+        "style_rules": {
+          "margin": "13px auto",
+          "box-shadow": "1px 1px 3px 1px #333",
+          "page-break-after": "always",
+          "page-break-inside": "avoid",
+          "/* Needed by IE to make box-shadow works * https": "//developer.mozilla.org/en-US/docs/Web/CSS/box-shadow */\n    border-collapse: separate",
+          "width": "793.760000pt",
+          "height": "1122.560000pt"
+        }
+      }
+    },
+    {
+      "number": 11,
+      "type": "pf",
+      "dimensions": {
+        "width": "793.76pt",
+        "height": "1122.56pt",
+        "orientation": "portrait"
+      },
+      "content": {
+        "tag_counts": {
+          "{http://www.w3.org/1999/xhtml}div": 63,
+          "{http://www.w3.org/1999/xhtml}img": 1,
+          "{http://www.w3.org/1999/xhtml}span": 932
+        },
+        "container_hierarchy": [
+          "html",
+          "body",
+          "div",
+          "div.pf.w0.h0"
+        ],
+        "style_rules": {
+          "margin": "13px auto",
+          "box-shadow": "1px 1px 3px 1px #333",
+          "page-break-after": "always",
+          "page-break-inside": "avoid",
+          "/* Needed by IE to make box-shadow works * https": "//developer.mozilla.org/en-US/docs/Web/CSS/box-shadow */\n    border-collapse: separate",
+          "width": "793.760000pt",
+          "height": "1122.560000pt"
+        }
+      }
+    },
+    {
+      "number": 12,
+      "type": "pf",
+      "dimensions": {
+        "width": "793.76pt",
+        "height": "1122.56pt",
+        "orientation": "portrait"
+      },
+      "content": {
+        "tag_counts": {
+          "{http://www.w3.org/1999/xhtml}div": 47,
+          "{http://www.w3.org/1999/xhtml}img": 1,
+          "{http://www.w3.org/1999/xhtml}span": 548
+        },
+        "container_hierarchy": [
+          "html",
+          "body",
+          "div",
+          "div.pf.w0.h0"
+        ],
+        "style_rules": {
+          "margin": "13px auto",
+          "box-shadow": "1px 1px 3px 1px #333",
+          "page-break-after": "always",
+          "page-break-inside": "avoid",
+          "/* Needed by IE to make box-shadow works * https": "//developer.mozilla.org/en-US/docs/Web/CSS/box-shadow */\n    border-collapse: separate",
+          "width": "793.760000pt",
+          "height": "1122.560000pt"
+        }
+      }
+    }
+  ]
+}

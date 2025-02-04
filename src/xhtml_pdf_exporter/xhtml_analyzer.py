@@ -3,7 +3,7 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from xml.etree import ElementTree as ET
 
 
@@ -89,6 +89,7 @@ class PageMetrics:
     page_number: int
     style_type: StyleType
     page_type: PageType
+    element: ET.Element
     container_hierarchy: List[str] = field(default_factory=list)
     style_rules: Dict[str, str] = field(default_factory=dict)
     tag_counts: Dict[str, int] = field(default_factory=dict)
@@ -123,6 +124,7 @@ class XHTMLAnalyzer:
         self.tree = None
         self.style_type: Optional[StyleType] = None
         self.processed_elements: Set[ET.Element] = set()
+        self.debug: bool = False
 
     def analyze_file(self, xhtml_path: Union[str, Path]) -> dict:
         """
@@ -204,56 +206,56 @@ class XHTMLAnalyzer:
             self.processed_elements.add(child)
 
     def _is_semantic_page(self, element: ET.Element) -> bool:
-        """
-        Check if element has semantic indicators of being a page.
-        """
-        # First check existing semantic indicators
-        page_keywords = {"page", "sheet", "pageview", "pdf-page", "print-page"}
+        """Enhanced page detection logic."""
+        # Existing code...
 
-        elem_id = element.get("id", "").lower()
-        if any(kw in elem_id for kw in page_keywords):
-            return True
+        # Add checks for common page indicators
+        if element.tag.endswith("}div"):  # Handle namespaced tags
+            classes = element.get("class", "").split()
 
-        classes = element.get("class", "").lower().split()
-        if any(kw in cls for kw in page_keywords for cls in classes):
-            return True
-
-        style_attr = element.get("style", "").lower()
-        print_indicators = {"page-break", "break-after", "break-before", "@page"}
-        if any(ind in style_attr for ind in print_indicators):
-            return True
-
-        # Add dimension-based detection
-        width, height, _ = self._extract_dimensions(element)
-        if width and height:
-            # Check if dimensions are significant enough to be a page
-            w_px = width.to_pixels()
-            h_px = height.to_pixels()
-
-            # Consider elements with dimensions above certain thresholds as pages
-            # These thresholds match common document dimensions
-            if w_px >= 500 and h_px >= 500:  # Minimum size threshold
+            # Common page class patterns
+            page_classes = {"pf", "pc", "pageView", "page", "page-container"}
+            if any(cls in classes for cls in page_classes):
                 return True
 
-            # Additional checks for common page sizes (in pixels at 96 DPI)
-            common_sizes = [
-                (1920, 1080),  # HD
-                (1080, 1528),  # Common in sample 3
-                (816, 1056),  # US Letter
-                (816, 1144),  # US Legal
-                (595, 842),  # A4
-            ]
+            # Check for size-based indicators
+            style = element.get("style", "")
+            if "width" in style and "height" in style:
+                width_match = re.search(r"width:\s*(\d+\.?\d*)(pt|px|mm|cm|in)", style)
+                height_match = re.search(
+                    r"height:\s*(\d+\.?\d*)(pt|px|mm|cm|in)", style
+                )
+                if width_match and height_match:
+                    # Convert to points for comparison
+                    width_val = self._convert_to_points(
+                        float(width_match.group(1)), width_match.group(2)
+                    )
+                    height_val = self._convert_to_points(
+                        float(height_match.group(1)), height_match.group(2)
+                    )
 
-            # Allow for some variation in dimensions (±10%)
-            for common_w, common_h in common_sizes:
-                w_match = 0.9 * common_w <= w_px <= 1.1 * common_w
-                h_match = 0.9 * common_h <= h_px <= 1.1 * common_h
-                if (w_match and h_match) or (
-                    w_match and h_match
-                ):  # Match in either orientation
-                    return True
+                    # Check if dimensions suggest a page
+                    return (
+                        width_val > 400 and height_val > 400
+                    )  # Typical page size threshold
+
+            # Check for page-specific attributes
+            page_indicators = {"data-page", "data-page-number", "page-number"}
+            if any(attr in element.attrib for attr in page_indicators):
+                return True
 
         return False
+
+    def _convert_to_points(self, value: float, unit: str) -> float:
+        """Convert various units to points."""
+        conversions = {
+            "pt": 1,
+            "px": 0.75,  # 1px ≈ 0.75pt
+            "mm": 2.83465,  # 1mm ≈ 2.83465pt
+            "cm": 28.3465,  # 1cm = 10mm
+            "in": 72,  # 1in = 72pt
+        }
+        return value * conversions.get(unit, 1)
 
     def _parse_style_blocks(self, root: ET.Element) -> None:
         """
@@ -415,6 +417,7 @@ class XHTMLAnalyzer:
             page_number=page_number,
             style_type=used_style_type,
             page_type=page_type,
+            element=element,
             container_hierarchy=self._get_container_hierarchy(element),
             style_rules=style_rules,
         )
@@ -467,16 +470,174 @@ class XHTMLAnalyzer:
         for child in element:
             self._count_tags(child, counts)
 
+    def _extract_page_numbers(self, element: ET.Element) -> Dict[str, Optional[str]]:
+        """Enhanced page number extraction with hierarchical analysis."""
+        numbers = {
+            "physical": None,
+            "document": None,
+            "section": None,
+            "context": {},  # Store additional context
+        }
+
+        if self.debug:
+            print("\nPage Number Analysis:")
+            print(f"Element ID: {element.get('id', 'No ID')}")
+
+        # 1. Check structural indicators
+        parent_chain = []
+        current = element
+        while current is not None:
+            if isinstance(current.tag, str):
+                attrs = current.attrib
+                parent_chain.append(
+                    {
+                        "tag": current.tag,
+                        "id": attrs.get("id", ""),
+                        "class": attrs.get("class", ""),
+                        "data-page": attrs.get("data-page", ""),
+                    }
+                )
+                # Look for page indicators in each ancestor
+                for attr, value in attrs.items():
+                    if any(x in attr.lower() for x in ["page", "num", "index"]):
+                        numbers["context"][f"ancestor_{attr}"] = value
+            current = current.getparent() if hasattr(current, "getparent") else None
+
+        if self.debug:
+            print("Parent chain:", parent_chain)
+
+        # 2. Check explicit page attributes with enhanced patterns
+        page_patterns = {
+            "id": [
+                r"pf(\d+)",
+                r"page[_-]?(\d+)",
+                r"p(\d+)",
+            ],
+            "data-page": [r"(\d+)"],
+            "data-page-number": [r"(\d+)"],
+            "data-document-page": [r"(\d+)"],
+        }
+
+        for attr, patterns in page_patterns.items():
+            value = element.get(attr)
+            if value:
+                for pattern in patterns:
+                    match = re.search(pattern, value.lower())
+                    if match:
+                        numbers["document"] = match.group(1)
+                        numbers["context"][f"from_{attr}"] = value
+                        if self.debug:
+                            print(f"Found number in {attr}: {match.group(1)}")
+                        break
+
+        # 3. Analyze text content with context
+        text = "".join(element.itertext()).strip()
+        text_patterns = [
+            (r"Page\s*(\d+)\s*of\s*(\d+)", "page_of_total"),
+            (r"[Pp]age\s*(\d+)", "page_label"),
+            (r"^\s*(\d+)\s*$", "standalone_number"),
+            (r"\b(\d+)\s*of\s*\d+\b", "x_of_y"),
+            (r"§\s*(\d+)", "section_number"),
+        ]
+
+        for pattern, pattern_type in text_patterns:
+            match = re.search(pattern, text)
+            if match:
+                numbers["document"] = match.group(1)
+                if pattern_type == "page_of_total" and len(match.groups()) > 1:
+                    numbers["context"]["total_pages"] = match.group(2)
+                numbers["context"]["pattern_type"] = pattern_type
+                if self.debug:
+                    print(f"Found {pattern_type}: {match.group(1)}")
+                break
+
+        # 4. Check XBRL elements for page numbers
+        ns = "{http://www.xbrl.org/2013/inlineXBRL}"
+        for xbrl_elem in element.findall(f".//{ns}*"):
+            name = xbrl_elem.get("name", "")
+            if any(x in name.lower() for x in ["page", "num", "index"]):
+                numbers["context"]["xbrl_page_ref"] = name
+                if self.debug:
+                    print(f"Found XBRL page reference: {name}")
+
+        # 5. Validate and clean numbers
+        if numbers["document"]:
+            try:
+                # Ensure numeric and remove leading zeros
+                numbers["document"] = str(int(numbers["document"]))
+            except ValueError:
+                numbers["document"] = None
+
+        if self.debug:
+            print("Final numbers:", numbers)
+            print("Text context:", text[:100] if len(text) > 100 else text)
+
+        return numbers
+
+    def _analyze_page_structure(self, element: ET.Element) -> Dict[str, Any]:
+        """Enhanced page structure analysis with better logging."""
+        structure = {
+            "depth": 0,
+            "child_count": len(list(element)),
+            "text_blocks": len(list(element.itertext())),
+            "numbers": self._extract_page_numbers(element),
+            "classes": element.get("class", "").split(),
+            "attributes": dict(element.attrib),
+            "parent_chain": [],
+            "xbrl_elements": [],
+            "style_info": {},
+        }
+
+        # Log detailed structure
+        if self.debug:
+            print("\nPage Structure Analysis:")
+            print(f"Element tag: {element.tag}")
+            print(f"Classes: {structure['classes']}")
+            print(f"Attributes: {structure['attributes']}")
+            print(f"Child count: {structure['child_count']}")
+
+            # Analyze parent chain
+            parent = element
+            while parent is not None:
+                structure["parent_chain"].append(
+                    {"tag": parent.tag, "class": parent.get("class", "")}
+                )
+                parent = parent.getparent() if hasattr(parent, "getparent") else None
+
+            print("Parent chain:", structure["parent_chain"])
+
+            # Log style information
+            style = element.get("style", "")
+            if style:
+                style_dict = dict(
+                    item.split(":") for item in style.split(";") if ":" in item
+                )
+                structure["style_info"] = style_dict
+                print("Style info:", style_dict)
+
+            # Check for XBRL elements
+            ns = "{http://www.xbrl.org/2013/inlineXBRL}"
+            xbrl_elements = element.findall(f".//{ns}*")
+            if xbrl_elements:
+                print(f"Found {len(xbrl_elements)} XBRL elements")
+                structure["xbrl_elements"] = [
+                    e.tag.replace(ns, "") for e in xbrl_elements
+                ]
+
+        return structure
+
     def _generate_report(self) -> dict:
         """
         Package up all results (PageMetrics) into a top-level dictionary
         suitable for JSON serialization or further processing.
         """
-        return {
+        report = {
             "document_info": {
                 "total_pages": len(self.pages),
                 "style_type": self.style_type.name if self.style_type else None,
                 "has_xbrl": self.has_xbrl,
+                "page_number_format": self._detect_page_number_format(),
+                "structure_summary": self._generate_structure_summary(),
             },
             "pages": [
                 {
@@ -491,10 +652,59 @@ class XHTMLAnalyzer:
                         "tag_counts": pm.tag_counts,
                         "container_hierarchy": pm.container_hierarchy,
                         "style_rules": pm.style_rules,
+                        "structure": self._analyze_page_structure(pm.element),
                     },
                 }
                 for pm in self.pages
             ],
+        }
+        return report
+
+    def _detect_page_number_format(self) -> Dict[str, Any]:
+        """Analyze page numbering patterns in the document."""
+        return {
+            "physical_to_document": {
+                pm.page_number: self._extract_page_numbers(pm.element)
+                for pm in self.pages
+            },
+            "number_gaps": self._find_page_number_gaps(),
+            "numbering_type": self._detect_numbering_type(),
+        }
+
+    def _find_page_number_gaps(self) -> List[int]:
+        """Find gaps in page number sequence."""
+        page_numbers = sorted(pm.page_number for pm in self.pages)
+        expected = set(range(min(page_numbers), max(page_numbers) + 1))
+        return sorted(expected - set(page_numbers))
+
+    def _detect_numbering_type(self) -> str:
+        """Detect the type of page numbering used."""
+        # Analyze patterns in page numbers to determine if they're:
+        # - Sequential (1,2,3...)
+        # - Section-based (1.1, 1.2...)
+        # - Document-based (222, 223...)
+        return "mixed" if self._has_multiple_numbering_systems() else "sequential"
+
+    def _has_multiple_numbering_systems(self) -> bool:
+        """Check if document uses multiple numbering systems."""
+        physical_numbers = {pm.page_number for pm in self.pages}
+        document_numbers = {
+            int(num)
+            for pm in self.pages
+            if (num := self._extract_page_numbers(pm.element)["document"])
+            and num.isdigit()
+        }
+        return bool(document_numbers) and physical_numbers != document_numbers
+
+    def _generate_structure_summary(self) -> Dict[str, Any]:
+        """Generate a summary of the document's structure."""
+        # This is a placeholder implementation. You might want to implement
+        # a more robust structure analysis based on your document's structure.
+        return {
+            "total_elements": len(self.processed_elements),
+            "total_pages": len(self.pages),
+            "style_type": self.style_type.name if self.style_type else None,
+            "has_xbrl": self.has_xbrl,
         }
 
 
@@ -509,11 +719,13 @@ def analyze_xhtml(file_path: Union[str, Path]) -> dict:
 if __name__ == "__main__":
     sample_files = [
         "assets/xhtml/sample_0.xhtml",
-        "assets/xhtml/sample_1.xhtml",
-        "assets/xhtml/sample_2.xhtml",
+        # "assets/xhtml/sample_1.xhtml",
+        # "assets/xhtml/sample_2.xhtml",
         "assets/xhtml/sample_3.xhtml",
         "assets/xhtml/sample_4.xhtml",
-        "assets/xhtml/sample_5.xhtml",
+        # "assets/xhtml/sample_5.xhtml",
+        # "assets/xhtml/sample_7.xhtml",
+        # "assets/xhtml/sample_6.html",
     ]
     for file_path in sample_files:
         report = analyze_xhtml(file_path)
